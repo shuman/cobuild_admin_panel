@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CoBuild Manager — SuperAdmin Portal
+
+An independent Next.js SuperAdmin portal for CoBuild Manager, deployed on Vercel at `admin.cobuildmanager.com`.
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router), React 19, TypeScript
+- **UI**: MUI v7 (cherry-picked from Modernize admin template)
+- **Auth**: NextAuth.js v5 (JWT strategy) + Laravel backend JWT
+- **2FA**: TOTP (Google Authenticator) + Email OTP fallback
+- **State**: SWR for server state
+- **Toasts**: Sonner
+- **Deployment**: Vercel (no Docker)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm
+- Laravel backend running (default: `http://localhost:8181`)
+
+### Installation
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Copy the example env file:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` to match your setup:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8181/api
+NEXTAUTH_URL=http://localhost:3001
+NEXTAUTH_SECRET=your-secret-here
+AUTH_SECRET=your-secret-here
+```
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The portal runs on [http://localhost:3001](http://localhost:3001).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm start
+```
 
-## Learn More
+## Backend Requirements
 
-To learn more about Next.js, take a look at the following resources:
+The following backend changes are required (in the main `co_build_manager` repo):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Run migrations**: `php artisan migrate` to create `two_factor_auth` and `super_admin_allowed_ips` tables
+2. **Install Google2FA**: Already added via `composer require pragmarx/google2fa-laravel`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Features (MVP)
 
-## Deploy on Vercel
+- SuperAdmin-only login (email + password)
+- Two-factor authentication (TOTP + email OTP fallback)
+- IP whitelisting for SuperAdmin login
+- Login notifications (email + in-app)
+- Single session enforcement
+- 30-minute inactivity timeout
+- Dark/light mode toggle
+- Placeholder dashboard with quick links
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/
+    (auth)/         # Auth pages (login, 2FA verify)
+    (dashboard)/    # Dashboard layout + pages
+    api/auth/       # NextAuth API routes
+  components/
+    layout/         # Sidebar, header (from Modernize)
+    auth/           # Login form, 2FA forms
+    shared/         # Reusable components
+  lib/              # API client, auth config, constants
+  types/            # TypeScript definitions
+  utils/            # Theme config (from Modernize)
+```
+
+## Deployment (Vercel)
+
+1. Push to GitHub
+2. Import in Vercel
+3. Set environment variables:
+   - `NEXT_PUBLIC_API_URL` = `https://api.cobuildmanager.com/api`
+   - `NEXTAUTH_URL` = `https://admin.cobuildmanager.com`
+   - `NEXTAUTH_SECRET` = (generate a strong secret)
+   - `AUTH_SECRET` = (same as NEXTAUTH_SECRET)
+4. Deploy
+
+## License
+
+Private — CoBuild Manager
