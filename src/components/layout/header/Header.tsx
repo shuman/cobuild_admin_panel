@@ -18,7 +18,7 @@ import {
   IconSun,
   IconLogout,
 } from "@tabler/icons-react";
-import { useThemeMode } from "@/app/layout";
+import { useThemeMode } from "@/components/providers/Providers";
 import Profile from "./Profile";
 
 interface HeaderProps {

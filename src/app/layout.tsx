@@ -1,59 +1,36 @@
-"use client";
-import { useState, useMemo, useEffect, createContext, useContext } from "react";
-import { ThemeProvider } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
-import { baselightTheme, basedarkTheme } from "@/utils/theme/DefaultColors";
-import { SessionProvider } from "next-auth/react";
-import { Toaster } from "sonner";
+import type { Metadata, Viewport } from "next";
+import Providers from "@/components/providers/Providers";
 import "./global.css";
 
-type ThemeMode = "light" | "dark";
+export const metadata: Metadata = {
+  title: {
+    default: "CoBuild SuperAdmin",
+    template: "%s | CoBuild SuperAdmin",
+  },
+  description:
+    "CoBuild Manager SuperAdmin Portal — manage users, projects, and platform operations.",
+  applicationName: "CoBuild SuperAdmin",
+  robots: { index: true, follow: true },
+};
 
-interface ThemeContextType {
-  mode: ThemeMode;
-  toggleTheme: () => void;
-}
-
-export const ThemeContext = createContext<ThemeContextType>({
-  mode: "light",
-  toggleTheme: () => {},
-});
-
-export const useThemeMode = () => useContext(ThemeContext);
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
+  ],
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [mode, setMode] = useState<ThemeMode>("light");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const toggleTheme = () => {
-    setMode((prev) => (prev === "light" ? "dark" : "light"));
-  };
-
-  const theme = useMemo(
-    () => (mode === "light" ? baselightTheme : basedarkTheme),
-    [mode]
-  );
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <SessionProvider>
-          <ThemeContext.Provider value={{ mode, toggleTheme }}>
-            <ThemeProvider theme={theme}>
-              <CssBaseline />
-              {mounted && <Toaster position="top-right" richColors />}
-              {children}
-            </ThemeProvider>
-          </ThemeContext.Provider>
-        </SessionProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
