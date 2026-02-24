@@ -36,6 +36,12 @@ const Menuitems = [
     href: "/projects",
   },
   {
+    id: uniqueId(),
+    title: "Default Settings",
+    icon: IconSettings,
+    href: "/default-settings",
+  },
+  {
     navlabel: true,
     subheader: "SYSTEM",
   },

@@ -243,3 +243,26 @@ export interface HealthJsonResponse {
   finishedAt: number;
   checkResults: HealthCheckResult[];
 }
+
+// ── Default Settings ──
+
+export type SettingType = "json" | "array" | "boolean" | "integer" | "float" | "string";
+
+export interface DefaultSetting {
+  id: string;
+  key: string;
+  type: SettingType;
+  value: any;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DefaultSettingsResponse {
+  count: number;
+  page: number;
+  items: DefaultSetting[];
+  limit: number;
+  total_pages: number;
+}
