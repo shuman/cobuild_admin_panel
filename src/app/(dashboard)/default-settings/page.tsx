@@ -30,6 +30,10 @@ import {
     Divider,
     Grid,
     Chip,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel,
 } from "@mui/material";
 import {
     IconSearch,
@@ -38,10 +42,11 @@ import {
     IconChevronUp,
     IconDeviceFloppy,
     IconAlertCircle,
+    IconPlus,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import type { DefaultSetting, DefaultSettingsResponse } from "@/types";
+import type { DefaultSetting, DefaultSettingsResponse, SettingType } from "@/types";
 import JsonView from '@uiw/react-json-view';
 // If themes fail, we'll stick to default and fix later
 
@@ -70,6 +75,15 @@ export default function DefaultSettingsPage() {
         title: "",
         message: null,
         action: null,
+    });
+
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [newSetting, setNewSetting] = useState({
+        key: "",
+        type: "json" as SettingType,
+        value: "" as any,
+        description: "",
+        is_active: true,
     });
 
     const fetchSettings = useCallback(async () => {
@@ -181,6 +195,57 @@ export default function DefaultSettingsPage() {
                 }
             },
         });
+    };
+
+    const handleAddSetting = async () => {
+        if (!newSetting.key) {
+            toast.error("Key is required");
+            return;
+        }
+
+        setActionLoading("add");
+        try {
+            let valueToSave = newSetting.value;
+
+            // Pre-process values based on type if needed
+            if ((newSetting.type === 'json' || newSetting.type === 'array') && typeof valueToSave === 'string' && valueToSave.trim() !== '') {
+                try {
+                    valueToSave = JSON.parse(valueToSave);
+                } catch {
+                    toast.error("Invalid JSON/Array format");
+                    setActionLoading(null);
+                    return;
+                }
+            } else if (newSetting.type === 'boolean') {
+                valueToSave = typeof valueToSave === 'string' ? valueToSave === 'true' : !!valueToSave;
+            } else if (newSetting.type === 'integer') {
+                valueToSave = parseInt(valueToSave);
+            } else if (newSetting.type === 'float') {
+                valueToSave = parseFloat(valueToSave);
+            }
+
+            await api.post("/admin/default-settings", {
+                ...newSetting,
+                value: valueToSave
+            }, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            toast.success("Default setting added successfully");
+            setIsAddDialogOpen(false);
+            setNewSetting({
+                key: "",
+                type: "json",
+                value: "",
+                description: "",
+                is_active: true,
+            });
+            fetchSettings();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "Failed to add setting");
+        } finally {
+            setActionLoading(null);
+        }
     };
 
     const handleJsonValueChange = (settingId: string, path: string[], newValue: any) => {
@@ -296,13 +361,22 @@ export default function DefaultSettingsPage() {
         <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
                 <Typography variant="h4">Default Settings</Typography>
-                <Tooltip title="Refresh">
-                    <span>
-                        <IconButton onClick={fetchSettings} disabled={loading}>
-                            <IconRefresh size={20} />
-                        </IconButton>
-                    </span>
-                </Tooltip>
+                <Stack direction="row" spacing={1}>
+                    <Button
+                        variant="contained"
+                        startIcon={<IconPlus size={20} />}
+                        onClick={() => setIsAddDialogOpen(true)}
+                    >
+                        Add New
+                    </Button>
+                    <Tooltip title="Refresh">
+                        <span>
+                            <IconButton onClick={fetchSettings} disabled={loading}>
+                                <IconRefresh size={20} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                </Stack>
             </Stack>
 
             <Paper sx={{ p: 2, mb: 2 }} elevation={1}>
@@ -541,6 +615,99 @@ export default function DefaultSettingsPage() {
                         if (confirmDialog.action) await confirmDialog.action();
                         setConfirmDialog(prev => ({ ...prev, open: false }));
                     }} variant="contained">Confirm</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Add New Setting Dialog */}
+            <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ fontWeight: 'bold' }}>Add New Default Setting</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={3} sx={{ mt: 1 }}>
+                        <TextField
+                            fullWidth
+                            label="Setting Key"
+                            placeholder="e.g. system_maintenance_mode"
+                            required
+                            value={newSetting.key}
+                            onChange={(e) => setNewSetting({ ...newSetting, key: e.target.value })}
+                        />
+                        <FormControl fullWidth>
+                            <InputLabel id="setting-type-label">Type</InputLabel>
+                            <Select
+                                id="setting-type-select"
+                                labelId="setting-type-label"
+                                label="Type"
+                                value={newSetting.type}
+                                onChange={(e) => setNewSetting({ ...newSetting, type: e.target.value as SettingType, value: e.target.value === 'boolean' ? false : "" })}
+                            >
+                                <MenuItem value="json">JSON</MenuItem>
+                                <MenuItem value="array">Array</MenuItem>
+                                <MenuItem value="boolean">Boolean</MenuItem>
+                                <MenuItem value="integer">Integer</MenuItem>
+                                <MenuItem value="float">Float</MenuItem>
+                            </Select>
+                        </FormControl>
+
+                        {newSetting.type === 'boolean' ? (
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography>Value:</Typography>
+                                <Switch
+                                    id="setting-value-switch"
+                                    checked={newSetting.value === true}
+                                    onChange={(e) => setNewSetting({ ...newSetting, value: e.target.checked })}
+                                />
+                                <Typography variant="body2">{newSetting.value ? 'True' : 'False'}</Typography>
+                            </Stack>
+                        ) : (
+                            <TextField
+                                id="setting-value-input"
+                                fullWidth
+                                multiline={newSetting.type === 'json' || newSetting.type === 'array'}
+                                rows={newSetting.type === 'json' || newSetting.type === 'array' ? 6 : 1}
+                                label="Value"
+                                placeholder={newSetting.type === 'json' ? '{"key": "value"}' : newSetting.type === 'array' ? '["item1", "item2"]' : 'Value'}
+                                value={newSetting.value}
+                                onChange={(e) => setNewSetting({ ...newSetting, value: e.target.value })}
+                                sx={newSetting.type === 'json' || newSetting.type === 'array' ? {
+                                    '& .MuiInputBase-root': {
+                                        fontFamily: 'monospace',
+                                    }
+                                } : {}}
+                            />
+                        )}
+
+                        <TextField
+                            id="setting-description-input"
+                            fullWidth
+                            label="Description"
+                            placeholder="What is this setting for?"
+                            multiline
+                            rows={2}
+                            value={newSetting.description}
+                            onChange={(e) => setNewSetting({ ...newSetting, description: e.target.value })}
+                        />
+
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                            <Typography>Active State:</Typography>
+                            <Switch
+                                id="setting-status-switch"
+                                checked={newSetting.is_active}
+                                onChange={(e) => setNewSetting({ ...newSetting, is_active: e.target.checked })}
+                            />
+                        </Stack>
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5 }}>
+                    <Button onClick={() => setIsAddDialogOpen(false)} color="inherit">Cancel</Button>
+                    <Button
+                        id="create-setting-submit"
+                        onClick={handleAddSetting}
+                        variant="contained"
+                        disabled={actionLoading === 'add'}
+                        startIcon={actionLoading === 'add' ? <CircularProgress size={16} color="inherit" /> : <IconDeviceFloppy size={18} />}
+                    >
+                        Create Setting
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>
