@@ -29,6 +29,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="emotion-insertion-point" content="" />
+      </head>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>

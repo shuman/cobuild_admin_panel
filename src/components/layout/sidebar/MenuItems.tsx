@@ -5,6 +5,7 @@ import {
   IconShieldLock,
   IconActivity,
   IconSettings,
+  IconBrandWebflow,
 } from "@tabler/icons-react";
 import { uniqueId } from "lodash";
 
@@ -63,6 +64,16 @@ const Menuitems = [
     title: "Settings",
     icon: IconSettings,
     href: "/setup-2fa",
+  },
+  {
+    navlabel: true,
+    subheader: "DOCS",
+  },
+  {
+    id: uniqueId(),
+    title: "WebSocket Events",
+    icon: IconBrandWebflow,
+    href: "/docs/websocket-events",
   },
 ];
 

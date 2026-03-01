@@ -138,9 +138,16 @@ export interface ProjectUser {
   name: string;
   email: string;
   phone: string | null;
+  is_active?: boolean;
+  is_verified?: boolean;
   project_user_id?: string;
+  project_user_type_id?: string;
+  project_user_type_name?: string | null;
+  project_user_type_slug?: string | null;
   project_user_note?: string | null;
   project_user_is_active?: boolean;
+  project_user_invitation_status?: string | null;
+  project_user_joined_at?: string | null;
   project_user_created_at?: string;
   created_at?: string;
 }

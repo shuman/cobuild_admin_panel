@@ -224,6 +224,11 @@ export default function ProjectDetailPage({
       ? project.created_by
       : null;
 
+  // Exclude members and vendors — they already appear in their own sections
+  const filteredUsers = projectUsers.filter(
+    (u) => u.project_user_type_slug !== "member" && u.project_user_type_slug !== "vendor"
+  );
+
   const SectionTable = ({
     title,
     count,
@@ -330,8 +335,8 @@ export default function ProjectDetailPage({
       </Paper>
 
       {/* Users (project users from admin API) */}
-      <SectionTable title="Users" count={projectUsers.length} loading={loadingUsers}>
-        {projectUsers.length === 0 ? (
+      <SectionTable title="Users" count={filteredUsers.length} loading={loadingUsers}>
+        {filteredUsers.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No users
           </Typography>
@@ -343,16 +348,41 @@ export default function ProjectDetailPage({
                   <TableCell>Name</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Phone</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Active</TableCell>
                   <TableCell>Joined</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {projectUsers.map((m) => (
-                  <TableRow key={m.id}>
+                {filteredUsers.map((m) => (
+                  <TableRow key={m.project_user_id ?? m.id}>
                     <TableCell>{m.name}</TableCell>
                     <TableCell>{m.email}</TableCell>
                     <TableCell>{m.phone ?? "—"}</TableCell>
+                    <TableCell>
+                      {m.project_user_type_name ? (
+                        <Chip
+                          size="small"
+                          label={m.project_user_type_name}
+                          variant="outlined"
+                          color={
+                            m.project_user_type_slug === "creator"
+                              ? "primary"
+                              : m.project_user_type_slug === "member"
+                                ? "info"
+                                : m.project_user_type_slug === "vendor"
+                                  ? "warning"
+                                  : "default"
+                          }
+                        />
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {m.project_user_invitation_status ? (
+                        <Chip size="small" label={m.project_user_invitation_status} variant="outlined" />
+                      ) : "—"}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         size="small"
@@ -362,9 +392,11 @@ export default function ProjectDetailPage({
                       />
                     </TableCell>
                     <TableCell>
-                      {m.project_user_created_at
-                        ? formatDate(m.project_user_created_at)
-                        : "—"}
+                      {m.project_user_joined_at
+                        ? formatDate(m.project_user_joined_at)
+                        : m.project_user_created_at
+                          ? formatDate(m.project_user_created_at)
+                          : "—"}
                     </TableCell>
                   </TableRow>
                 ))}

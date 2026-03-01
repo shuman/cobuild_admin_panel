@@ -5,6 +5,7 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { baselightTheme, basedarkTheme } from "@/utils/theme/DefaultColors";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
+import ThemeRegistry from "@/components/providers/ThemeRegistry";
 
 type ThemeMode = "light" | "dark";
 
@@ -40,11 +41,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <ThemeContext.Provider value={{ mode, toggleTheme }}>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          {mounted && <Toaster position="top-right" richColors />}
-          {children}
-        </ThemeProvider>
+        <ThemeRegistry>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            {mounted && <Toaster position="top-right" richColors />}
+            {children}
+          </ThemeProvider>
+        </ThemeRegistry>
       </ThemeContext.Provider>
     </SessionProvider>
   );
