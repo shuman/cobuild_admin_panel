@@ -6,6 +6,7 @@ import {
   IconActivity,
   IconSettings,
   IconBrandWebflow,
+  IconDatabase,
 } from "@tabler/icons-react";
 import { uniqueId } from "lodash";
 
@@ -58,6 +59,12 @@ const Menuitems = [
     title: "System Health",
     icon: IconActivity,
     href: "/health",
+  },
+  {
+    id: uniqueId(),
+    title: "Databases",
+    icon: IconDatabase,
+    href: "/databases",
   },
   {
     id: uniqueId(),
