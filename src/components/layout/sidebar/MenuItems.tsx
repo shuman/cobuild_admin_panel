@@ -7,6 +7,7 @@ import {
   IconSettings,
   IconBrandWebflow,
   IconDatabase,
+  IconShield,
 } from "@tabler/icons-react";
 import { uniqueId } from "lodash";
 
@@ -36,6 +37,12 @@ const Menuitems = [
     title: "Projects",
     icon: IconBuildingSkyscraper,
     href: "/projects",
+  },
+  {
+    id: uniqueId(),
+    title: "Project User Types",
+    icon: IconShield,
+    href: "/project-user-types",
   },
   {
     id: uniqueId(),

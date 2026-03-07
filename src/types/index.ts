@@ -251,6 +251,30 @@ export interface HealthJsonResponse {
   checkResults: HealthCheckResult[];
 }
 
+// ── Project User Types ──
+
+export type ProjectUserTypePermissions = Record<string, Record<string, boolean>>;
+
+export interface ProjectUserType {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  permissions: ProjectUserTypePermissions;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  project_users_count?: number;
+}
+
+export interface ProjectUserTypesResponse {
+  count: number;
+  page: number;
+  items: ProjectUserType[];
+  limit: number;
+  total_pages: number;
+}
+
 // ── Default Settings ──
 
 export type SettingType = "json" | "array" | "boolean" | "integer" | "float" | "string";
