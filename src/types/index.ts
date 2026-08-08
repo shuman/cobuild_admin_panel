@@ -275,6 +275,36 @@ export interface ProjectUserTypesResponse {
   total_pages: number;
 }
 
+// ── Onboarding Steps ──
+
+export type OnboardingTargetTable =
+  | "members"
+  | "properties"
+  | "data_protection_profiles"
+  | "deposits"
+  | "expenses";
+
+export interface OnboardingStep {
+  id: string;
+  key: string;
+  label: string;
+  description: string | null;
+  route_path: string | null;
+  target_table: OnboardingTargetTable | string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OnboardingStepsResponse {
+  count: number;
+  page: number;
+  items: OnboardingStep[];
+  limit: number;
+  total_pages: number;
+}
+
 // ── Default Settings ──
 
 export type SettingType = "json" | "array" | "boolean" | "integer" | "float" | "string";
