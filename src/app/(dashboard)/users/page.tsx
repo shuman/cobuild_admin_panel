@@ -33,6 +33,8 @@ import {
   Button,
   InputAdornment,
   SelectChangeEvent,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import {
   IconSearch,
@@ -42,6 +44,7 @@ import {
   IconRefresh,
   IconCheck,
   IconX,
+  IconEdit,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -62,6 +65,165 @@ function getRoleLabel(user: AdminUser): string {
   if (user.is_super_admin) return "Super Admin";
   if (user.is_admin) return "Admin";
   return "User";
+}
+
+type UserRole = "user" | "admin" | "super_admin";
+
+function getRoleValue(user: AdminUser): UserRole {
+  if (user.is_super_admin) return "super_admin";
+  if (user.is_admin) return "admin";
+  return "user";
+}
+
+interface EditUserForm {
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  is_active: boolean;
+}
+
+function EditUserDialog({
+  open,
+  user,
+  token,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  user: AdminUser | null;
+  token?: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<EditUserForm>({
+    name: "",
+    email: "",
+    phone: "",
+    role: "user",
+    is_active: true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setForm({
+        name: user.name,
+        email: user.email,
+        phone: user.phone ?? "",
+        role: getRoleValue(user),
+        is_active: user.is_active,
+      });
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    if (!form.name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!form.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await api.put(
+        `/admin/user/${user.id}`,
+        {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim() || null,
+          role: form.role,
+          is_active: form.is_active,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success("User updated");
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        "Failed to update user";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Edit User{user ? `: ${user.name}` : ""}</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2.5} sx={{ mt: 1 }}>
+          <TextField
+            label="Name"
+            required
+            fullWidth
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <TextField
+            label="Email"
+            required
+            fullWidth
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+          <TextField
+            label="Phone"
+            fullWidth
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+          />
+          <FormControl fullWidth>
+            <InputLabel>Role</InputLabel>
+            <Select
+              value={form.role}
+              label="Role"
+              onChange={(e) =>
+                setForm((f) => ({ ...f, role: e.target.value as UserRole }))
+              }
+            >
+              <MenuItem value="user">User</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="super_admin">Super Admin</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.is_active}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, is_active: e.target.checked }))
+                }
+                color="success"
+              />
+            }
+            label={form.is_active ? "Active" : "Inactive"}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} color="inherit" disabled={saving}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={saving}
+          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
+        >
+          Save Changes
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }
 
 export default function UsersPage() {
@@ -91,6 +253,9 @@ export default function UsersPage() {
     action: null,
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editUser, setEditUser] = useState<AdminUser | null>(null);
 
   const fetchUsers = useCallback(async () => {
     if (!token) return;
@@ -410,6 +575,21 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={0} justifyContent="flex-end">
+                      <Tooltip title="Edit">
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            disabled={actionLoading === user.id}
+                            onClick={() => {
+                              setEditUser(user);
+                              setEditOpen(true);
+                            }}
+                          >
+                            <IconEdit size={18} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                       <Tooltip
                         title={
                           user.is_super_admin && user.is_active
@@ -494,6 +674,14 @@ export default function UsersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <EditUserDialog
+        open={editOpen}
+        user={editUser}
+        token={token}
+        onClose={() => setEditOpen(false)}
+        onSaved={fetchUsers}
+      />
     </Box>
   );
 }
