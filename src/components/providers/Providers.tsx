@@ -1,11 +1,13 @@
 "use client";
-import { useState, useMemo, useEffect, createContext, useContext } from "react";
+import { useState, useMemo, createContext, useContext, useSyncExternalStore } from "react";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import { baselightTheme, basedarkTheme } from "@/utils/theme/DefaultColors";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
 import ThemeRegistry from "@/components/providers/ThemeRegistry";
+import { PWAProvider } from "@/components/pwa/PWAContext";
+import PWAInstallBanner from "@/components/pwa/PWAInstallBanner";
 
 type ThemeMode = "light" | "dark";
 
@@ -21,13 +23,15 @@ export const ThemeContext = createContext<ThemeContextType>({
 
 export const useThemeMode = () => useContext(ThemeContext);
 
+const emptySubscribe = () => () => {};
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>("light");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
 
   const toggleTheme = () => {
     setMode((prev) => (prev === "light" ? "dark" : "light"));
@@ -44,8 +48,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <ThemeRegistry>
           <ThemeProvider theme={theme}>
             <CssBaseline />
-            {mounted && <Toaster position="top-right" richColors />}
-            {children}
+            <PWAProvider>
+              {mounted && <Toaster position="top-right" richColors />}
+              {children}
+              <PWAInstallBanner />
+            </PWAProvider>
           </ThemeProvider>
         </ThemeRegistry>
       </ThemeContext.Provider>

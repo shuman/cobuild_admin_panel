@@ -7,6 +7,7 @@ import {
   styled,
   Stack,
   IconButton,
+  Button,
   Badge,
   Tooltip,
 } from "@mui/material";
@@ -17,8 +18,10 @@ import {
   IconMoon,
   IconSun,
   IconLogout,
+  IconDownload,
 } from "@tabler/icons-react";
 import { useThemeMode } from "@/components/providers/Providers";
+import { usePWA } from "@/components/pwa/PWAContext";
 import Profile from "./Profile";
 
 interface HeaderProps {
@@ -47,6 +50,8 @@ const ToolbarStyled = styled(Toolbar)(({ theme }) => ({
 
 const Header = ({ toggleMobileSidebar }: HeaderProps) => {
   const { mode, toggleTheme } = useThemeMode();
+  const { isInstallable, isInstalled, isIOS, openPrompt } = usePWA();
+  const canInstall = !isInstalled && (isInstallable || isIOS);
 
   return (
     <AppBarStyled position="sticky" color="default">
@@ -69,6 +74,41 @@ const Header = ({ toggleMobileSidebar }: HeaderProps) => {
         <Box flexGrow={1} />
 
         <Stack spacing={1} direction="row" alignItems="center">
+          {canInstall && (
+            <>
+              <Tooltip title={isIOS ? "Install guide for iOS" : "Install CoBuild App"}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="primary"
+                  onClick={openPrompt}
+                  startIcon={<IconDownload size={16} />}
+                  sx={{
+                    display: { xs: "none", sm: "inline-flex" },
+                    borderRadius: 2,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    fontSize: "0.8125rem",
+                    px: 1.5,
+                    py: 0.5,
+                  }}
+                >
+                  Install App
+                </Button>
+              </Tooltip>
+              <Tooltip title={isIOS ? "Install guide for iOS" : "Install CoBuild App"}>
+                <IconButton
+                  color="primary"
+                  onClick={openPrompt}
+                  sx={{ display: { xs: "inline-flex", sm: "none" } }}
+                  aria-label="Install app"
+                >
+                  <IconDownload size={20} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+
           <Tooltip title={mode === "light" ? "Dark mode" : "Light mode"}>
             <IconButton color="inherit" onClick={toggleTheme}>
               {mode === "light" ? (

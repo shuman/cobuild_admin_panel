@@ -9,13 +9,21 @@ import { useEffect } from "react";
  */
 export default function ServiceWorkerRegistrar() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    const shouldRegister =
+      process.env.NODE_ENV === "production" ||
+      process.env.NEXT_PUBLIC_ENABLE_SW_DEV === "true";
+
+    if (!shouldRegister) return;
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     const register = () => {
       navigator.serviceWorker
         .register("/sw.js", { scope: "/" })
-        .catch(() => {});
+        .catch((err) => {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("ServiceWorker registration failed:", err);
+          }
+        });
     };
 
     if (document.readyState === "complete") {

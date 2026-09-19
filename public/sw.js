@@ -14,10 +14,11 @@
  * _next/static URLs are content-hashed, so they can never go stale.
  */
 
-const VERSION = "cobuild-admin-v1";
+const VERSION = "cobuild-admin-v2";
 const CACHE = `${VERSION}-precache`;
 const PRECACHE_URLS = [
   "/offline",
+  "/login",
   "/site.webmanifest",
   "/android-chrome-192x192.png",
   "/android-chrome-512x512.png",
