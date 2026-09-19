@@ -34,6 +34,7 @@ import {
     Select,
     FormControl,
     InputLabel,
+    Skeleton,
 } from "@mui/material";
 import {
     IconSearch,
@@ -43,6 +44,8 @@ import {
     IconDeviceFloppy,
     IconAlertCircle,
     IconPlus,
+    IconShield,
+    IconSettings,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -56,6 +59,14 @@ interface ConfirmDialog {
     message: React.ReactNode;
     action: (() => Promise<void>) | null;
 }
+
+const TYPE_TONES: Record<string, "primary" | "secondary" | "success" | "info" | "warning" | "default"> = {
+    json: "primary",
+    array: "secondary",
+    boolean: "success",
+    integer: "info",
+    float: "warning",
+};
 
 export default function DefaultSettingsPage() {
     const { data: session } = useSession();
@@ -326,7 +337,7 @@ export default function DefaultSettingsPage() {
 
         if (val !== null && typeof val === 'object') {
             return (
-                <Box sx={{ pl: path.length > 0 ? 3 : 0, py: 0.5, borderLeft: path.length > 0 ? '1px solid #e0e0e0' : 'none' }}>
+                <Box sx={{ pl: path.length > 0 ? 3 : 0, py: 0.5, borderLeft: path.length > 0 ? '1px solid' : 'none', borderColor: 'divider' }}>
                     {path.length > 0 && <Typography variant="caption" color="primary" fontWeight="bold" sx={{ display: 'block', mb: 1 }}>{path[path.length - 1].toUpperCase()}</Typography>}
                     <Grid container spacing={2}>
                         {Object.keys(val).map(key => {
@@ -357,21 +368,166 @@ export default function DefaultSettingsPage() {
         );
     };
 
+    /** Expanded value editor, shared by the desktop Collapse row and the mobile card. */
+    const renderEditorPanel = (setting: DefaultSetting) => {
+        const isComplex = setting.type === 'json' || setting.type === 'array';
+        const currentVal = editValues[setting.id] !== undefined ? editValues[setting.id] : setting.value;
+
+        return (
+            <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: 'action.hover', borderRadius: { xs: 1.5, sm: 2 }, my: 1 }}>
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} mb={2}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <Typography variant="subtitle2" color="primary" fontWeight="bold">EDIT VALUE</Typography>
+                        {isComplex && (
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <Typography variant="caption">RAW</Typography>
+                                <Switch
+                                    size="small"
+                                    checked={(viewMode[setting.id] || 'graphical') === 'graphical'}
+                                    onChange={(e) => {
+                                        const isGraphical = e.target.checked;
+                                        if (isGraphical) {
+                                            // If switching to graphical, try to parse the string first
+                                            try {
+                                                if (typeof currentVal === 'string') {
+                                                    const parsed = JSON.parse(currentVal);
+                                                    setEditValues(prev => ({ ...prev, [setting.id]: parsed }));
+                                                }
+                                                setViewMode(prev => ({ ...prev, [setting.id]: 'graphical' }));
+                                            } catch {
+                                                toast.error("Cannot switch to graphical: Invalid JSON");
+                                            }
+                                        } else {
+                                            // Switching to raw: stringify current object
+                                            const stringified = typeof currentVal === 'object' ? JSON.stringify(currentVal, null, 4) : currentVal;
+                                            setEditValues(prev => ({ ...prev, [setting.id]: stringified }));
+                                            setViewMode(prev => ({ ...prev, [setting.id]: 'raw' }));
+                                        }
+                                    }}
+                                />
+                                <Typography variant="caption">GRAPHICAL</Typography>
+                            </Stack>
+                        )}
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                        {isComplex && (viewMode[setting.id] || 'graphical') === 'raw' && (
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                    try {
+                                        const val = currentVal;
+                                        const formatted = typeof val === 'string' ? JSON.stringify(JSON.parse(val), null, 4) : JSON.stringify(val, null, 4);
+                                        setEditValues(prev => ({ ...prev, [setting.id]: formatted }));
+                                        toast.success("JSON prettified");
+                                    } catch {
+                                        toast.error("Invalid JSON, cannot prettify");
+                                    }
+                                }}
+                            >
+                                Prettify
+                            </Button>
+                        )}
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<IconDeviceFloppy size={16} />}
+                            onClick={() => handleSaveSetting(setting)}
+                            disabled={actionLoading === setting.id || JSON.stringify(currentVal) === JSON.stringify(setting.value)}
+                        >
+                            Save Changes
+                        </Button>
+                    </Stack>
+                </Stack>
+
+                <Divider sx={{ mb: 2 }} />
+
+                {isComplex ? (
+                    (viewMode[setting.id] || 'graphical') === 'graphical' ? (
+                        // GRAPHICAL MODE (Auto-handles object or string-that-can-be-object)
+                        renderGraphicalEditor(setting.id, typeof currentVal === 'string' ? (() => { try { return JSON.parse(currentVal) } catch { return currentVal } })() : currentVal)
+                    ) : (
+                        // RAW MODE
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={15}
+                            variant="outlined"
+                            value={typeof currentVal === 'string' ? currentVal : JSON.stringify(currentVal, null, 4)}
+                            onChange={(e) => handleRawJsonChange(setting.id, e.target.value)}
+                            sx={{
+                                '& .MuiInputBase-root': {
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.875rem'
+                                }
+                            }}
+                        />
+                    )
+                ) : setting.type === 'boolean' ? (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography>Value:</Typography>
+                        <Switch
+                            checked={!!currentVal}
+                            onChange={(e) => setEditValues(prev => ({ ...prev, [setting.id]: e.target.checked }))}
+                        />
+                    </Stack>
+                ) : (
+                    <TextField
+                        fullWidth
+                        label="Value"
+                        type={setting.type === 'integer' || setting.type === 'float' ? 'number' : 'text'}
+                        value={currentVal ?? ""}
+                        onChange={(e) => setEditValues(prev => ({ ...prev, [setting.id]: e.target.value }))}
+                    />
+                )}
+            </Box>
+        );
+    };
+
     return (
-        <Box>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4">Default Settings</Typography>
-                <Stack direction="row" spacing={1}>
+        <Box sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
+            <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ xs: "flex-start", sm: "center" }}
+                justifyContent="space-between"
+                spacing={{ xs: 1.5, sm: 2 }}
+                sx={{ mb: { xs: 2, sm: 2.5 } }}
+            >
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                        variant="h4"
+                        sx={{
+                            fontWeight: 800,
+                            fontSize: { xs: "1.5rem", sm: "1.85rem" },
+                            letterSpacing: "-0.02em",
+                        }}
+                    >
+                        Default Settings
+                    </Typography>
+                    <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" }, mt: 0.25 }}
+                    >
+                        Manage global platform configuration keys and values
+                    </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                     <Button
                         variant="contained"
-                        startIcon={<IconPlus size={20} />}
+                        startIcon={<IconPlus size={18} />}
                         onClick={() => setIsAddDialogOpen(true)}
+                        sx={{ fontWeight: 600, textTransform: "none" }}
                     >
                         Add New
                     </Button>
                     <Tooltip title="Refresh">
                         <span>
-                            <IconButton onClick={fetchSettings} disabled={loading}>
+                            <IconButton
+                                onClick={fetchSettings}
+                                disabled={loading}
+                                sx={{ border: "1px solid", borderColor: "divider" }}
+                            >
                                 <IconRefresh size={20} />
                             </IconButton>
                         </span>
@@ -379,26 +535,130 @@ export default function DefaultSettingsPage() {
                 </Stack>
             </Stack>
 
-            <Paper sx={{ p: 2, mb: 2 }} elevation={1}>
+            <Paper
+                elevation={0}
+                sx={{
+                    p: 2,
+                    mb: 2,
+                    borderRadius: { xs: 2, sm: 2.5 },
+                    border: "1px solid",
+                    borderColor: "divider",
+                }}
+            >
                 <TextField
                     size="small"
                     fullWidth
                     placeholder="Search settings by key or description..."
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <IconSearch size={18} />
-                            </InputAdornment>
-                        ),
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <IconSearch size={18} />
+                                </InputAdornment>
+                            ),
+                        },
                     }}
                 />
             </Paper>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            <TableContainer component={Paper} elevation={1}>
+            <Paper
+                elevation={0}
+                sx={{
+                    borderRadius: { xs: 2, sm: 2.5 },
+                    border: "1px solid",
+                    borderColor: "divider",
+                    overflow: "hidden",
+                }}
+            >
+                {/* Mobile: expandable card list */}
+                <Box sx={{ display: { xs: "block", md: "none" }, p: { xs: 1.5, sm: 2 } }}>
+                    {loading ? (
+                        [0, 1, 2, 3].map((i) => (
+                            <Box
+                                key={i}
+                                sx={{
+                                    border: "1px solid",
+                                    borderColor: "divider",
+                                    borderRadius: 2,
+                                    p: 1.5,
+                                    mb: 1.5,
+                                }}
+                            >
+                                <Skeleton variant="text" width="55%" />
+                                <Skeleton variant="text" width="80%" />
+                                <Skeleton variant="rounded" width={150} height={22} />
+                            </Box>
+                        ))
+                    ) : filteredSettings.length === 0 ? (
+                        <Stack alignItems="center" spacing={1} sx={{ py: 4 }}>
+                            <IconSettings size={28} opacity={0.4} />
+                            <Typography color="text.secondary">No settings found</Typography>
+                        </Stack>
+                    ) : (
+                        filteredSettings.map((setting) => {
+                            const isExpanded = expandedId === setting.id;
+                            return (
+                                <Box
+                                    key={setting.id}
+                                    sx={{
+                                        border: "1px solid",
+                                        borderColor: "divider",
+                                        borderRadius: 2,
+                                        p: 1.5,
+                                        mb: 1.5,
+                                        opacity: actionLoading === setting.id ? 0.5 : 1,
+                                    }}
+                                >
+                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                                        <Box
+                                            sx={{ minWidth: 0, cursor: "pointer" }}
+                                            onClick={() => setExpandedId(isExpanded ? null : setting.id)}
+                                        >
+                                            <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: "monospace" }}>
+                                                {setting.key}
+                                            </Typography>
+                                            {setting.description && (
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {setting.description}
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                        <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
+                                            <Switch
+                                                size="small"
+                                                checked={setting.is_active}
+                                                onChange={() => handleToggleActive(setting)}
+                                                disabled={actionLoading === setting.id}
+                                            />
+                                            <IconButton size="small" onClick={() => setExpandedId(isExpanded ? null : setting.id)}>
+                                                {isExpanded ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
+                                            </IconButton>
+                                        </Stack>
+                                    </Stack>
+                                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1 }}>
+                                        <Chip
+                                            label={setting.type.toUpperCase()}
+                                            size="small"
+                                            variant="outlined"
+                                            color={TYPE_TONES[setting.type] ?? "default"}
+                                            sx={{ fontFamily: "monospace", fontSize: "0.68rem", fontWeight: 700 }}
+                                        />
+                                    </Stack>
+                                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                                        {renderEditorPanel(setting)}
+                                    </Collapse>
+                                </Box>
+                            );
+                        })
+                    )}
+                </Box>
+
+                {/* Desktop: expandable table */}
+                <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
                 <Table size="small">
                     <TableHead>
                         <TableRow>
@@ -412,22 +672,32 @@ export default function DefaultSettingsPage() {
                     </TableHead>
                     <TableBody>
                         {loading ? (
-                            <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                    <CircularProgress size={28} />
-                                </TableCell>
-                            </TableRow>
+                            [0, 1, 2, 3].map((i) => (
+                                <TableRow key={i}>
+                                    <TableCell colSpan={6} sx={{ py: 1.75 }}>
+                                        <Stack direction="row" spacing={2} alignItems="center">
+                                            <Skeleton variant="circular" width={20} height={20} />
+                                            <Skeleton variant="text" width="22%" />
+                                            <Skeleton variant="rounded" width={64} height={22} />
+                                            <Skeleton variant="text" width="32%" sx={{ display: { lg: "block", md: "none" } }} />
+                                            <Skeleton variant="text" width="10%" />
+                                        </Stack>
+                                    </TableCell>
+                                </TableRow>
+                            ))
                         ) : filteredSettings.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                                    <Typography color="text.secondary">No settings found</Typography>
+                                    <Stack alignItems="center" spacing={1}>
+                                        <IconSettings size={28} opacity={0.4} />
+                                        <Typography color="text.secondary">No settings found</Typography>
+                                    </Stack>
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filteredSettings.map((setting) => {
                                 const isExpanded = expandedId === setting.id;
                                 const isComplex = setting.type === 'json' || setting.type === 'array';
-                                const currentVal = editValues[setting.id] !== undefined ? editValues[setting.id] : setting.value;
 
                                 return (
                                     <React.Fragment key={setting.id}>
@@ -439,8 +709,20 @@ export default function DefaultSettingsPage() {
                                                     </IconButton>
                                                 )}
                                             </TableCell>
-                                            <TableCell><Typography fontWeight={600}>{setting.key}</Typography></TableCell>
-                                            <TableCell><Box sx={{ bgcolor: 'grey.100', px: 1, py: 0.25, borderRadius: 1, display: 'inline-block', fontSize: '0.75rem', fontWeight: 'bold' }}>{setting.type.toUpperCase()}</Box></TableCell>
+                                            <TableCell>
+                                                <Typography fontWeight={600} sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                                                    {setting.key}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={setting.type.toUpperCase()}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color={TYPE_TONES[setting.type] ?? "default"}
+                                                    sx={{ fontFamily: "monospace", fontSize: "0.68rem", fontWeight: 700 }}
+                                                />
+                                            </TableCell>
                                             <TableCell>{setting.description || "—"}</TableCell>
                                             <TableCell align="center">
                                                 <Switch
@@ -464,113 +746,7 @@ export default function DefaultSettingsPage() {
                                         <TableRow>
                                             <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
                                                 <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                                                    <Box sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 1, my: 1 }}>
-                                                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                                                            <Stack direction="row" spacing={2} alignItems="center">
-                                                                <Typography variant="subtitle2" color="primary" fontWeight="bold">EDIT VALUE</Typography>
-                                                                {isComplex && (
-                                                                    <Stack direction="row" spacing={1} alignItems="center">
-                                                                        <Typography variant="caption">RAW</Typography>
-                                                                        <Switch
-                                                                            size="small"
-                                                                            checked={(viewMode[setting.id] || 'graphical') === 'graphical'}
-                                                                            onChange={(e) => {
-                                                                                const isGraphical = e.target.checked;
-                                                                                if (isGraphical) {
-                                                                                    // If switching to graphical, try to parse the string first
-                                                                                    try {
-                                                                                        if (typeof currentVal === 'string') {
-                                                                                            const parsed = JSON.parse(currentVal);
-                                                                                            setEditValues(prev => ({ ...prev, [setting.id]: parsed }));
-                                                                                        }
-                                                                                        setViewMode(prev => ({ ...prev, [setting.id]: 'graphical' }));
-                                                                                    } catch {
-                                                                                        toast.error("Cannot switch to graphical: Invalid JSON");
-                                                                                    }
-                                                                                } else {
-                                                                                    // Switching to raw: stringify current object
-                                                                                    const stringified = typeof currentVal === 'object' ? JSON.stringify(currentVal, null, 4) : currentVal;
-                                                                                    setEditValues(prev => ({ ...prev, [setting.id]: stringified }));
-                                                                                    setViewMode(prev => ({ ...prev, [setting.id]: 'raw' }));
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                        <Typography variant="caption">GRAPHICAL</Typography>
-                                                                    </Stack>
-                                                                )}
-                                                            </Stack>
-                                                            <Stack direction="row" spacing={1}>
-                                                                {isComplex && (viewMode[setting.id] || 'graphical') === 'raw' && (
-                                                                    <Button
-                                                                        size="small"
-                                                                        variant="outlined"
-                                                                        onClick={() => {
-                                                                            try {
-                                                                                const val = currentVal;
-                                                                                const formatted = typeof val === 'string' ? JSON.stringify(JSON.parse(val), null, 4) : JSON.stringify(val, null, 4);
-                                                                                setEditValues(prev => ({ ...prev, [setting.id]: formatted }));
-                                                                                toast.success("JSON prettified");
-                                                                            } catch {
-                                                                                toast.error("Invalid JSON, cannot prettify");
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        Prettify
-                                                                    </Button>
-                                                                )}
-                                                                <Button
-                                                                    variant="contained"
-                                                                    size="small"
-                                                                    startIcon={<IconDeviceFloppy size={16} />}
-                                                                    onClick={() => handleSaveSetting(setting)}
-                                                                    disabled={actionLoading === setting.id || JSON.stringify(currentVal) === JSON.stringify(setting.value)}
-                                                                >
-                                                                    Save Changes
-                                                                </Button>
-                                                            </Stack>
-                                                        </Stack>
-
-                                                        <Divider sx={{ mb: 2 }} />
-
-                                                        {isComplex ? (
-                                                            (viewMode[setting.id] || 'graphical') === 'graphical' ? (
-                                                                // GRAPHICAL MODE (Auto-handles object or string-that-can-be-object)
-                                                                renderGraphicalEditor(setting.id, typeof currentVal === 'string' ? (() => { try { return JSON.parse(currentVal) } catch { return currentVal } })() : currentVal)
-                                                            ) : (
-                                                                // RAW MODE
-                                                                <TextField
-                                                                    fullWidth
-                                                                    multiline
-                                                                    rows={15}
-                                                                    variant="outlined"
-                                                                    value={typeof currentVal === 'string' ? currentVal : JSON.stringify(currentVal, null, 4)}
-                                                                    onChange={(e) => handleRawJsonChange(setting.id, e.target.value)}
-                                                                    sx={{
-                                                                        '& .MuiInputBase-root': {
-                                                                            fontFamily: 'monospace',
-                                                                            fontSize: '0.875rem'
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            )
-                                                        ) : setting.type === 'boolean' ? (
-                                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                                <Typography>Value:</Typography>
-                                                                <Switch
-                                                                    checked={!!currentVal}
-                                                                    onChange={(e) => setEditValues(prev => ({ ...prev, [setting.id]: e.target.checked }))}
-                                                                />
-                                                            </Stack>
-                                                        ) : (
-                                                            <TextField
-                                                                fullWidth
-                                                                label="Value"
-                                                                type={setting.type === 'integer' || setting.type === 'float' ? 'number' : 'text'}
-                                                                value={currentVal ?? ""}
-                                                                onChange={(e) => setEditValues(prev => ({ ...prev, [setting.id]: e.target.value }))}
-                                                            />
-                                                        )}
-                                                    </Box>
+                                                    {renderEditorPanel(setting)}
                                                 </Collapse>
                                             </TableCell>
                                         </TableRow>
@@ -580,17 +756,59 @@ export default function DefaultSettingsPage() {
                         )}
                     </TableBody>
                 </Table>
-            </TableContainer>
+                </TableContainer>
+            </Paper>
 
             {permissionStructure && (
-                <Box sx={{ mt: 6 }}>
-                    <Divider sx={{ mb: 4 }}>
-                        <Chip label="BASE PERMISSION STRUCTURE" size="small" />
-                    </Divider>
-                    <Typography variant="subtitle2" color="text.secondary" mb={2} fontWeight="bold">
-                        REFERENCE ONLY (READ-ONLY)
-                    </Typography>
-                    <Paper variant="outlined" sx={{ p: 2, bgcolor: '#ffffff', borderRadius: 2, overflow: 'hidden' }}>
+                <Box sx={{ mt: { xs: 4, sm: 5 } }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} mb={2}>
+                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
+                            <Box
+                                sx={{
+                                    width: { xs: 36, sm: 42 },
+                                    height: { xs: 36, sm: 42 },
+                                    borderRadius: 2,
+                                    bgcolor: (th) => `${th.palette.primary.main}18`,
+                                    color: 'primary.main',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <IconShield size={22} />
+                            </Box>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="subtitle1" fontWeight={700} sx={{ letterSpacing: '-0.01em' }}>
+                                    Base Permission Structure
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ display: 'block', fontSize: { xs: '0.72rem', sm: '0.78rem' } }}
+                                >
+                                    Reference blueprint for project user type permissions
+                                </Typography>
+                            </Box>
+                        </Stack>
+                        <Chip
+                            label="READ-ONLY"
+                            size="small"
+                            variant="outlined"
+                            color="info"
+                            sx={{ fontWeight: 600, fontSize: '0.68rem', letterSpacing: '0.05em', flexShrink: 0 }}
+                        />
+                    </Stack>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: { xs: 1.5, sm: 2.5 },
+                            borderRadius: { xs: 2, sm: 2.5 },
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            overflow: 'hidden',
+                        }}
+                    >
                         <JsonView
                             value={permissionStructure}
                             displayDataTypes={false}
@@ -604,7 +822,10 @@ export default function DefaultSettingsPage() {
 
             <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog(prev => ({ ...prev, open: false }))} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <IconAlertCircle color="#5D87FF" /> {confirmDialog.title}
+                    <Box component="span" sx={{ display: 'flex', color: 'primary.main' }}>
+                        <IconAlertCircle size={22} />
+                    </Box>
+                    {confirmDialog.title}
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText component="div">{confirmDialog.message}</DialogContentText>

@@ -10,7 +10,7 @@ import {
   Badge,
   Tooltip,
 } from "@mui/material";
-import { useSession, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import {
   IconBellRinging,
   IconMenu,
@@ -25,23 +25,28 @@ interface HeaderProps {
   toggleMobileSidebar: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
+const AppBarStyled = styled(AppBar)(({ theme }) => ({
+  boxShadow: "none",
+  background: theme.palette.background.paper,
+  justifyContent: "center",
+  backdropFilter: "blur(4px)",
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  [theme.breakpoints.up("lg")]: {
+    minHeight: "70px",
+  },
+}));
+
+const ToolbarStyled = styled(Toolbar)(({ theme }) => ({
+  width: "100%",
+  color: theme.palette.text.secondary,
+  gap: theme.spacing(0.5),
+  [theme.breakpoints.up("sm")]: {
+    minHeight: "68px",
+  },
+}));
+
 const Header = ({ toggleMobileSidebar }: HeaderProps) => {
   const { mode, toggleTheme } = useThemeMode();
-
-  const AppBarStyled = styled(AppBar)(({ theme }) => ({
-    boxShadow: "none",
-    background: theme.palette.background.paper,
-    justifyContent: "center",
-    backdropFilter: "blur(4px)",
-    [theme.breakpoints.up("lg")]: {
-      minHeight: "70px",
-    },
-  }));
-
-  const ToolbarStyled = styled(Toolbar)(({ theme }) => ({
-    width: "100%",
-    color: theme.palette.text.secondary,
-  }));
 
   return (
     <AppBarStyled position="sticky" color="default">

@@ -26,12 +26,14 @@ import {
   InputAdornment,
   Switch,
   Chip,
+  TableSortLabel,
+  FormControlLabel,
+  Grid,
+  Skeleton,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  TableSortLabel,
-  FormControlLabel,
 } from "@mui/material";
 import {
   IconSearch,
@@ -42,9 +44,12 @@ import {
   IconToggleLeft,
   IconToggleRight,
   IconListCheck,
+  IconCheck,
+  IconX,
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import StatCard from "@/components/dashboard/StatCard";
 import type {
   OnboardingStep,
   OnboardingStepsResponse,
@@ -327,6 +332,54 @@ type SortField =
   | "created_at"
   | "updated_at";
 
+/** Row actions shared by the desktop table and the mobile card list. */
+function StepActions({
+  step,
+  actionLoading,
+  onToggle,
+  onEdit,
+  onDelete,
+}: {
+  step: OnboardingStep;
+  actionLoading: string | null;
+  onToggle: (step: OnboardingStep) => void;
+  onEdit: (step: OnboardingStep) => void;
+  onDelete: (step: OnboardingStep) => void;
+}) {
+  return (
+    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+      <Tooltip title={step.is_active ? "Deactivate" : "Activate"}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={() => onToggle(step)}
+            disabled={actionLoading === step.id}
+            color={step.is_active ? "success" : "default"}
+          >
+            {actionLoading === step.id ? (
+              <CircularProgress size={16} />
+            ) : step.is_active ? (
+              <IconToggleRight size={18} />
+            ) : (
+              <IconToggleLeft size={18} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title="Edit">
+        <IconButton size="small" onClick={() => onEdit(step)}>
+          <IconEdit size={17} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete">
+        <IconButton size="small" color="error" onClick={() => onDelete(step)}>
+          <IconTrash size={17} />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OnboardingStepsPage() {
@@ -443,22 +496,49 @@ export default function OnboardingStepsPage() {
   const activeCount = steps.filter((s) => s.is_active).length;
   const inactiveCount = totalCount - activeCount;
 
+  // Shared row actions for the desktop table and mobile card list
+  const stepActions = (step: OnboardingStep) => (
+    <StepActions
+      step={step}
+      actionLoading={actionLoading}
+      onToggle={handleToggleStatus}
+      onEdit={(s) => {
+        setEditTarget(s);
+        setAddEditDialog(true);
+      }}
+      onDelete={(s) => {
+        setDeleteTarget(s);
+        setDeleteDialog(true);
+      }}
+    />
+  );
+
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
       {/* ── Header ── */}
       <Stack
-        direction="row"
-        alignItems="center"
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ xs: "flex-start", sm: "center" }}
         justifyContent="space-between"
-        mb={3}
-        flexWrap="wrap"
-        gap={2}
+        spacing={{ xs: 1.5, sm: 2 }}
+        sx={{ mb: { xs: 2, sm: 2.5 } }}
       >
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: "1.5rem", sm: "1.85rem" },
+              letterSpacing: "-0.02em",
+            }}
+          >
             Onboarding Steps
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" }, mt: 0.25 }}
+          >
             Manage the setup checklist shown to project owners
           </Typography>
         </Box>
@@ -469,65 +549,79 @@ export default function OnboardingStepsPage() {
             setEditTarget(null);
             setAddEditDialog(true);
           }}
+          sx={{ fontWeight: 600, textTransform: "none", flexShrink: 0 }}
         >
           Add Step
         </Button>
       </Stack>
 
-      {/* ── Stats Row ── */}
-      <Stack direction="row" spacing={2} mb={3} flexWrap="wrap">
-        <Chip
-          label={`Total: ${totalCount}`}
-          color="default"
-          variant="outlined"
-          sx={{ fontWeight: 600, fontSize: "0.85rem" }}
-        />
-        <Chip
-          label={`Active: ${activeCount}`}
-          color="success"
-          variant={filterActive === "active" ? "filled" : "outlined"}
-          onClick={() => setFilterActive((v) => (v === "active" ? "all" : "active"))}
-          sx={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-        />
-        <Chip
-          label={`Inactive: ${inactiveCount}`}
-          color="error"
-          variant={filterActive === "inactive" ? "filled" : "outlined"}
-          onClick={() => setFilterActive((v) => (v === "inactive" ? "all" : "inactive"))}
-          sx={{ fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
-        />
-      </Stack>
+      {/* ── Filter stat cards ── */}
+      <Grid container spacing={{ xs: 1.5, sm: 2.5 }} sx={{ mb: 0.5 }}>
+        <Grid size={{ xs: 4, sm: 4 }}>
+          <StatCard
+            title="Total Steps"
+            value={loading ? null : String(totalCount)}
+            icon={<IconListCheck size={22} />}
+            tone="primary"
+            selected={filterActive === "all"}
+            onClick={() => setFilterActive("all")}
+          />
+        </Grid>
+        <Grid size={{ xs: 4, sm: 4 }}>
+          <StatCard
+            title="Active"
+            value={loading ? null : String(activeCount)}
+            icon={<IconCheck size={22} />}
+            tone="success"
+            selected={filterActive === "active"}
+            onClick={() =>
+              setFilterActive((v) => (v === "active" ? "all" : "active"))
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 4, sm: 4 }}>
+          <StatCard
+            title="Inactive"
+            value={loading ? null : String(inactiveCount)}
+            icon={<IconX size={22} />}
+            tone="warning"
+            selected={filterActive === "inactive"}
+            onClick={() =>
+              setFilterActive((v) => (v === "inactive" ? "all" : "inactive"))
+            }
+          />
+        </Grid>
+      </Grid>
 
       {/* ── Toolbar ── */}
-      <Stack direction="row" spacing={2} mb={2} alignItems="center" flexWrap="wrap">
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        sx={{ mt: 2, mb: 2 }}
+        alignItems={{ xs: "stretch", sm: "center" }}
+      >
         <TextField
           size="small"
           placeholder="Search by key, label, or target table…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 300 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <IconSearch size={18} />
-              </InputAdornment>
-            ),
+          sx={{ minWidth: { sm: 300 }, width: { xs: "100%" }, flexGrow: 1 }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <IconSearch size={18} />
+                </InputAdornment>
+              ),
+            },
           }}
         />
-        <FormControl size="small" sx={{ minWidth: 140 }}>
-          <InputLabel>Status</InputLabel>
-          <Select
-            label="Status"
-            value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value as typeof filterActive)}
-          >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="active">Active</MenuItem>
-            <MenuItem value="inactive">Inactive</MenuItem>
-          </Select>
-        </FormControl>
         <Tooltip title="Refresh">
-          <IconButton onClick={fetchSteps} disabled={loading}>
+          <IconButton
+            onClick={fetchSteps}
+            disabled={loading}
+            sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}
+          >
             {loading ? <CircularProgress size={18} /> : <IconRefresh size={18} />}
           </IconButton>
         </Tooltip>
@@ -540,7 +634,142 @@ export default function OnboardingStepsPage() {
       )}
 
       {/* ── Table ── */}
-      <TableContainer component={Paper} variant="outlined">
+      <Paper
+        variant="outlined"
+        sx={{ borderRadius: { xs: 2, sm: 2.5 }, overflow: "hidden" }}
+      >
+        {/* Mobile: compact card list */}
+        <Box sx={{ display: { xs: "block", md: "none" }, p: { xs: 1.5, sm: 2 } }}>
+          {loading ? (
+            [0, 1, 2, 3].map((i) => (
+              <Box
+                key={i}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                }}
+              >
+                <Skeleton variant="text" width="55%" />
+                <Skeleton variant="text" width="80%" />
+                <Skeleton variant="rounded" width={150} height={22} />
+              </Box>
+            ))
+          ) : steps.length === 0 ? (
+            <Stack alignItems="center" spacing={1} sx={{ py: 4 }}>
+              <IconListCheck size={28} opacity={0.4} />
+              <Typography color="text.secondary">No onboarding steps found</Typography>
+            </Stack>
+          ) : (
+            steps.map((step) => (
+              <Box
+                key={step.id}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                  opacity: actionLoading === step.id ? 0.5 : 1,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={1}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: "50%",
+                          border: "1px solid",
+                          borderColor: "divider",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          fontSize: "0.7rem",
+                          fontWeight: 700,
+                          color: "text.secondary",
+                        }}
+                      >
+                        {step.sort_order}
+                      </Box>
+                      <Typography variant="subtitle2" fontWeight={600} noWrap>
+                        {step.label}
+                      </Typography>
+                    </Stack>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontFamily: "monospace", display: "block", mt: 0.25 }}
+                    >
+                      {step.key}
+                    </Typography>
+                    {step.description && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {step.description}
+                      </Typography>
+                    )}
+                  </Box>
+                  {stepActions(step)}
+                </Stack>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  alignItems="center"
+                  sx={{ mt: 1, flexWrap: "wrap", rowGap: 0.5 }}
+                >
+                  <Chip
+                    label={step.is_active ? "Active" : "Inactive"}
+                    color={step.is_active ? "success" : "default"}
+                    size="small"
+                  />
+                  <Chip
+                    label={step.target_table}
+                    size="small"
+                    variant="outlined"
+                    sx={{ fontFamily: "monospace", fontSize: "0.72rem" }}
+                  />
+                  {step.route_path && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        fontFamily: "monospace",
+                        ml: "auto",
+                        maxWidth: "60%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {step.route_path}
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            ))
+          )}
+        </Box>
+
+        {/* Desktop: table */}
+        <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: "action.hover" }}>
@@ -614,9 +843,23 @@ export default function OnboardingStepsPage() {
               steps.map((step) => (
                 <TableRow key={step.id} hover>
                   <TableCell>
-                    <Typography variant="body2" color="text.secondary">
+                    <Box
+                      sx={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        border: "1px solid",
+                        borderColor: "divider",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        color: "text.secondary",
+                      }}
+                    >
                       {step.sort_order}
-                    </Typography>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight={600}>
@@ -674,57 +917,14 @@ export default function OnboardingStepsPage() {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                      <Tooltip title={step.is_active ? "Deactivate" : "Activate"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleToggleStatus(step)}
-                            disabled={actionLoading === step.id}
-                            color={step.is_active ? "success" : "default"}
-                          >
-                            {actionLoading === step.id ? (
-                              <CircularProgress size={16} />
-                            ) : step.is_active ? (
-                              <IconToggleRight size={18} />
-                            ) : (
-                              <IconToggleLeft size={18} />
-                            )}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setEditTarget(step);
-                            setAddEditDialog(true);
-                          }}
-                        >
-                          <IconEdit size={17} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => {
-                            setDeleteTarget(step);
-                            setDeleteDialog(true);
-                          }}
-                        >
-                          <IconTrash size={17} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
+                  <TableCell align="right">{stepActions(step)}</TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+        </TableContainer>
+      </Paper>
 
       {/* ── Add/Edit Dialog ── */}
       <OnboardingStepDialog

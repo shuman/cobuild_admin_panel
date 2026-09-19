@@ -33,6 +33,7 @@ import {
   Button,
   InputAdornment,
   SelectChangeEvent,
+  Skeleton,
 } from "@mui/material";
 import {
   IconSearch,
@@ -57,6 +58,84 @@ interface ConfirmDialog {
   title: string;
   message: string;
   action: (() => Promise<void>) | null;
+}
+
+/** Row actions shared by the desktop table and the mobile card list. */
+function ProjectActions({
+  project,
+  actionLoading,
+  onToggleActive,
+  onSuspend,
+  onResume,
+  onDelete,
+}: {
+  project: Project;
+  actionLoading: string | null;
+  onToggleActive: (project: Project) => void;
+  onSuspend: (project: Project) => void;
+  onResume: (project: Project) => void;
+  onDelete: (project: Project) => void;
+}) {
+  const isSuspended = project.status === "Suspended";
+  return (
+    <Stack direction="row" spacing={0} justifyContent="flex-end">
+      <Tooltip title={project.is_active ? "Deactivate" : "Activate"}>
+        <span>
+          <IconButton
+            size="small"
+            color={project.is_active ? "warning" : "success"}
+            disabled={actionLoading === project.id}
+            onClick={() => onToggleActive(project)}
+          >
+            {project.is_active ? (
+              <IconPlayerPause size={18} />
+            ) : (
+              <IconPlayerPlay size={18} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+      {isSuspended ? (
+        <Tooltip title="Resume (set Active)">
+          <span>
+            <IconButton
+              size="small"
+              color="success"
+              disabled={actionLoading === project.id}
+              onClick={() => onResume(project)}
+            >
+              <IconPlayerPlay size={18} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : (
+        <Tooltip title="Suspend">
+          <span>
+            <IconButton
+              size="small"
+              color="warning"
+              disabled={actionLoading === project.id}
+              onClick={() => onSuspend(project)}
+            >
+              <IconBan size={18} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
+      <Tooltip title="Delete">
+        <span>
+          <IconButton
+            size="small"
+            color="error"
+            disabled={actionLoading === project.id}
+            onClick={() => onDelete(project)}
+          >
+            <IconTrash size={18} />
+          </IconButton>
+        </span>
+      </Tooltip>
+    </Stack>
+  );
 }
 
 export default function ProjectsPage() {
@@ -252,6 +331,47 @@ export default function ProjectsPage() {
     });
   };
 
+  // Shared row actions for the desktop table and mobile card list
+  const projectActions = (project: Project) => (
+    <ProjectActions
+      project={project}
+      actionLoading={actionLoading}
+      onToggleActive={(p) =>
+        openConfirm(
+          p.is_active ? "Deactivate Project" : "Activate Project",
+          `Are you sure you want to ${p.is_active ? "deactivate" : "activate"} "${p.name}"?`,
+          () =>
+            handleUpdateProject(
+              p.id,
+              { is_active: !p.is_active },
+              `Project ${p.is_active ? "deactivated" : "activated"}`
+            )
+        )
+      }
+      onSuspend={(p) =>
+        openConfirm(
+          "Suspend Project",
+          `Are you sure you want to suspend "${p.name}"? This will set its status to Suspended.`,
+          () => handleUpdateProject(p.id, { status: "Suspended" }, "Project suspended")
+        )
+      }
+      onResume={(p) =>
+        openConfirm(
+          "Resume Project",
+          `Resume "${p.name}" and set status back to Active?`,
+          () => handleUpdateProject(p.id, { status: "Active" }, "Project resumed")
+        )
+      }
+      onDelete={(p) =>
+        openConfirm(
+          "Delete Project",
+          `Are you sure you want to delete "${p.name}"? This action uses soft delete.`,
+          () => handleDeleteProject(p.id)
+        )
+      }
+    />
+  );
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -265,7 +385,11 @@ export default function ProjectsPage() {
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 2 }} elevation={1}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
           <TextField
             size="small"
             placeholder="Search by name or slug..."
@@ -280,9 +404,9 @@ export default function ProjectsPage() {
                 ),
               },
             }}
-            sx={{ minWidth: 250, flexGrow: 1 }}
+            sx={{ minWidth: { sm: 250 }, width: { xs: "100%" }, flexGrow: 1 }}
           />
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: { sm: 140 }, width: { xs: "100%" } }}>
             <InputLabel>Status</InputLabel>
             <Select
               value={statusFilter}
@@ -297,7 +421,7 @@ export default function ProjectsPage() {
               <MenuItem value="Cancelled">Cancelled</MenuItem>
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: { sm: 140 }, width: { xs: "100%" } }}>
             <InputLabel>Active</InputLabel>
             <Select
               value={activeFilter}
@@ -325,7 +449,102 @@ export default function ProjectsPage() {
       )}
 
       {/* Table */}
-      <TableContainer component={Paper} elevation={1}>
+      <Paper elevation={1}>
+        {/* Mobile: compact card list */}
+        <Box sx={{ display: { xs: "block", md: "none" }, p: { xs: 1.5, sm: 2 } }}>
+          {loading ? (
+            [0, 1, 2, 3].map((i) => (
+              <Box
+                key={i}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                }}
+              >
+                <Skeleton variant="text" width="55%" />
+                <Skeleton variant="text" width="80%" />
+                <Skeleton variant="rounded" width={150} height={22} />
+              </Box>
+            ))
+          ) : projects.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+              No projects found
+            </Typography>
+          ) : (
+            projects.map((project) => (
+              <Box
+                key={project.id}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                  opacity: actionLoading === project.id ? 0.5 : 1,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={1}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Link
+                      href={`/projects/${project.id}`}
+                      style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {project.name}
+                      </Typography>
+                    </Link>
+                    <Typography variant="caption" color="text.secondary">
+                      {project.slug}
+                    </Typography>
+                    {project.created_by && typeof project.created_by === "object" && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", wordBreak: "break-all" }}
+                      >
+                        by {project.created_by.name} · {project.created_by.email}
+                      </Typography>
+                    )}
+                  </Box>
+                  {projectActions(project)}
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: "wrap", rowGap: 0.5 }}>
+                  <Chip
+                    label={project.status}
+                    color={getStatusColor(project.status)}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    icon={project.is_active ? <IconCheck size={14} /> : <IconX size={14} />}
+                    label={project.is_active ? "Active" : "Inactive"}
+                    color={project.is_active ? "success" : "default"}
+                    size="small"
+                    variant="outlined"
+                  />
+                  {project.is_premium && (
+                    <Chip label="Premium" color="warning" size="small" variant="filled" />
+                  )}
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                  {project.users_count} users · {project.members_count} members · Created{" "}
+                  {formatDate(project.created_at)}
+                </Typography>
+              </Box>
+            ))
+          )}
+        </Box>
+
+        {/* Desktop: table */}
+        <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -478,118 +697,25 @@ export default function ProjectsPage() {
                   </TableCell>
 
                   {/* Actions */}
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0} justifyContent="flex-end">
-                      {/* Toggle Active */}
-                      <Tooltip title={project.is_active ? "Deactivate" : "Activate"}>
-                        <IconButton
-                          size="small"
-                          color={project.is_active ? "warning" : "success"}
-                          disabled={actionLoading === project.id}
-                          onClick={() =>
-                            openConfirm(
-                              project.is_active ? "Deactivate Project" : "Activate Project",
-                              `Are you sure you want to ${project.is_active ? "deactivate" : "activate"} "${project.name}"?`,
-                              () =>
-                                handleUpdateProject(
-                                  project.id,
-                                  { is_active: !project.is_active },
-                                  `Project ${project.is_active ? "deactivated" : "activated"}`
-                                )
-                            )
-                          }
-                        >
-                          {project.is_active ? (
-                            <IconPlayerPause size={18} />
-                          ) : (
-                            <IconPlayerPlay size={18} />
-                          )}
-                        </IconButton>
-                      </Tooltip>
-
-                      {/* Suspend / Resume */}
-                      {project.status !== "Suspended" ? (
-                        <Tooltip title="Suspend">
-                          <IconButton
-                            size="small"
-                            color="warning"
-                            disabled={actionLoading === project.id}
-                            onClick={() =>
-                              openConfirm(
-                                "Suspend Project",
-                                `Are you sure you want to suspend "${project.name}"? This will set its status to Suspended.`,
-                                () =>
-                                  handleUpdateProject(
-                                    project.id,
-                                    { status: "Suspended" },
-                                    "Project suspended"
-                                  )
-                              )
-                            }
-                          >
-                            <IconBan size={18} />
-                          </IconButton>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip title="Resume (set Active)">
-                          <IconButton
-                            size="small"
-                            color="success"
-                            disabled={actionLoading === project.id}
-                            onClick={() =>
-                              openConfirm(
-                                "Resume Project",
-                                `Resume "${project.name}" and set status back to Active?`,
-                                () =>
-                                  handleUpdateProject(
-                                    project.id,
-                                    { status: "Active" },
-                                    "Project resumed"
-                                  )
-                              )
-                            }
-                          >
-                            <IconPlayerPlay size={18} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-
-                      {/* Soft Delete */}
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          disabled={actionLoading === project.id}
-                          onClick={() =>
-                            openConfirm(
-                              "Delete Project",
-                              `Are you sure you want to delete "${project.name}"? This action uses soft delete.`,
-                              () => handleDeleteProject(project.id)
-                            )
-                          }
-                        >
-                          <IconTrash size={18} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
+                  <TableCell align="right">{projectActions(project)}</TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-
-        {/* Pagination */}
-        <TablePagination
-          component="div"
-          count={totalCount}
-          page={page}
-          onPageChange={handlePageChange}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          rowsPerPageOptions={[100, 250, 500, 1000]}
-        />
       </TableContainer>
+
+      {/* Pagination */}
+      <TablePagination
+        component="div"
+        count={totalCount}
+        page={page}
+        onPageChange={handlePageChange}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleRowsPerPageChange}
+        rowsPerPageOptions={[100, 250, 500, 1000]}
+      />
+    </Paper>
 
       {/* Confirmation Dialog */}
       <Dialog open={confirmDialog.open} onClose={closeConfirm} maxWidth="xs" fullWidth>

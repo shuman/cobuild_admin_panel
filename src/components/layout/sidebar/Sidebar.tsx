@@ -12,7 +12,7 @@ const Sidebar = ({
   onSidebarClose,
   isSidebarOpen,
 }: SidebarProps) => {
-  const lgUp = useMediaQuery((theme: any) => theme.breakpoints.up("lg"));
+  const lgUp = useMediaQuery((theme) => theme.breakpoints.up("lg"));
   const sidebarWidth = "270px";
 
   const scrollbarStyles = {
@@ -66,7 +66,8 @@ const Sidebar = ({
       }}
     >
       <Box>
-        <SidebarItems />
+        {/* Auto-close the drawer after a nav link is clicked */}
+        <SidebarItems onNavigate={onSidebarClose} />
       </Box>
     </Drawer>
   );

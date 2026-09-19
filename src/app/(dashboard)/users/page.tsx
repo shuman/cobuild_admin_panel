@@ -23,6 +23,7 @@ import {
   TablePagination,
   TableSortLabel,
   CircularProgress,
+  Skeleton,
   Alert,
   Stack,
   Dialog,
@@ -226,6 +227,77 @@ function EditUserDialog({
   );
 }
 
+/** Row actions shared by the desktop table and the mobile card list. */
+function UserActions({
+  user,
+  actionLoading,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
+  user: AdminUser;
+  actionLoading: string | null;
+  onEdit: (user: AdminUser) => void;
+  onToggle: (user: AdminUser) => void;
+  onDelete: (user: AdminUser) => void;
+}) {
+  return (
+    <Stack direction="row" spacing={0} justifyContent="flex-end">
+      <Tooltip title="Edit">
+        <span>
+          <IconButton
+            size="small"
+            color="primary"
+            disabled={actionLoading === user.id}
+            onClick={() => onEdit(user)}
+          >
+            <IconEdit size={18} />
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip
+        title={
+          user.is_super_admin && user.is_active
+            ? "Cannot deactivate Super Admin"
+            : user.is_active
+              ? "Deactivate"
+              : "Activate"
+        }
+      >
+        <span>
+          <IconButton
+            size="small"
+            color={user.is_active ? "warning" : "success"}
+            disabled={
+              actionLoading === user.id ||
+              (user.is_super_admin && user.is_active)
+            }
+            onClick={() => onToggle(user)}
+          >
+            {user.is_active ? (
+              <IconPlayerPause size={18} />
+            ) : (
+              <IconPlayerPlay size={18} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title={user.is_super_admin ? "Cannot delete Super Admin" : "Delete"}>
+        <span>
+          <IconButton
+            size="small"
+            color="error"
+            disabled={actionLoading === user.id || user.is_super_admin}
+            onClick={() => onDelete(user)}
+          >
+            <IconTrash size={18} />
+          </IconButton>
+        </span>
+      </Tooltip>
+    </Stack>
+  );
+}
+
 export default function UsersPage() {
   const { data: session } = useSession();
   const token = (session as any)?.apiToken;
@@ -392,6 +464,32 @@ export default function UsersPage() {
     });
   };
 
+  // Shared row actions for the desktop table and mobile card list
+  const userActions = (user: AdminUser) => (
+    <UserActions
+      user={user}
+      actionLoading={actionLoading}
+      onEdit={(u) => {
+        setEditUser(u);
+        setEditOpen(true);
+      }}
+      onToggle={(u) =>
+        openConfirm(
+          u.is_active ? "Deactivate User" : "Activate User",
+          `Are you sure you want to ${u.is_active ? "deactivate" : "activate"} "${u.name}"?`,
+          () => handleToggleStatus(u.id)
+        )
+      }
+      onDelete={(u) =>
+        openConfirm(
+          "Delete User",
+          `Are you sure you want to delete "${u.name}"? This action cannot be undone.`,
+          () => handleDeleteUser(u.id)
+        )
+      }
+    />
+  );
+
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
@@ -406,7 +504,11 @@ export default function UsersPage() {
       </Stack>
 
       <Paper sx={{ p: 2, mb: 2 }} elevation={1}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
           <TextField
             size="small"
             placeholder="Search by name, email or phone..."
@@ -421,9 +523,9 @@ export default function UsersPage() {
                 ),
               },
             }}
-            sx={{ minWidth: 250, flexGrow: 1 }}
+            sx={{ minWidth: { sm: 250 }, width: { xs: "100%" }, flexGrow: 1 }}
           />
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: { sm: 140 }, width: { xs: "100%" } }}>
             <InputLabel>Role</InputLabel>
             <Select value={roleFilter} label="Role" onChange={handleRoleFilterChange}>
               <MenuItem value="">All</MenuItem>
@@ -432,7 +534,7 @@ export default function UsersPage() {
               <MenuItem value="user">User</MenuItem>
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: { sm: 140 }, width: { xs: "100%" } }}>
             <InputLabel>Active</InputLabel>
             <Select value={activeFilter} label="Active" onChange={handleActiveFilterChange}>
               <MenuItem value="">All</MenuItem>
@@ -453,7 +555,115 @@ export default function UsersPage() {
         </Alert>
       )}
 
-      <TableContainer component={Paper} elevation={1}>
+      <Paper elevation={1}>
+        {/* Mobile: compact card list */}
+        <Box sx={{ display: { xs: "block", md: "none" }, p: { xs: 1.5, sm: 2 } }}>
+          {loading ? (
+            [0, 1, 2, 3].map((i) => (
+              <Box
+                key={i}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                }}
+              >
+                <Skeleton variant="text" width="55%" />
+                <Skeleton variant="text" width="80%" />
+                <Skeleton variant="rounded" width={150} height={22} />
+              </Box>
+            ))
+          ) : users.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+              No users found
+            </Typography>
+          ) : (
+            users.map((user) => (
+              <Box
+                key={user.id}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                  opacity: actionLoading === user.id ? 0.5 : 1,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={1}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Link
+                      href={`/users/${user.id}`}
+                      style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {user.name}
+                      </Typography>
+                    </Link>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ wordBreak: "break-all" }}
+                    >
+                      {user.email}
+                    </Typography>
+                    {user.phone && (
+                      <Typography variant="caption" color="text.secondary">
+                        {user.phone}
+                      </Typography>
+                    )}
+                  </Box>
+                  {userActions(user)}
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: "wrap", rowGap: 0.5 }}>
+                  <Chip
+                    label={getRoleLabel(user)}
+                    size="small"
+                    variant="outlined"
+                    color={
+                      user.is_super_admin
+                        ? "error"
+                        : user.is_admin
+                          ? "primary"
+                          : "default"
+                    }
+                  />
+                  <Chip
+                    icon={user.is_active ? <IconCheck size={14} /> : <IconX size={14} />}
+                    label={user.is_active ? "Active" : "Inactive"}
+                    size="small"
+                    variant="outlined"
+                    color={user.is_active ? "success" : "default"}
+                  />
+                  <Chip
+                    label={user.is_verified ? "Verified" : "Unverified"}
+                    size="small"
+                    variant="outlined"
+                    color={user.is_verified ? "success" : "default"}
+                  />
+                  <Chip
+                    label={`${user.projects?.length ?? 0} projects`}
+                    size="small"
+                    variant="outlined"
+                  />
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                  Last login {formatDate(user.last_login_at)} · Created {formatDate(user.created_at)}
+                </Typography>
+              </Box>
+            ))
+          )}
+        </Box>
+
+        {/* Desktop: table */}
+        <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -573,92 +783,24 @@ export default function UsersPage() {
                   <TableCell align="center">
                     {user.projects?.length ?? 0}
                   </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0} justifyContent="flex-end">
-                      <Tooltip title="Edit">
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            disabled={actionLoading === user.id}
-                            onClick={() => {
-                              setEditUser(user);
-                              setEditOpen(true);
-                            }}
-                          >
-                            <IconEdit size={18} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip
-                        title={
-                          user.is_super_admin && user.is_active
-                            ? "Cannot deactivate Super Admin"
-                            : user.is_active
-                              ? "Deactivate"
-                              : "Activate"
-                        }
-                      >
-                        <span>
-                          <IconButton
-                            size="small"
-                            color={user.is_active ? "warning" : "success"}
-                            disabled={
-                              actionLoading === user.id ||
-                              (user.is_super_admin && user.is_active)
-                            }
-                            onClick={() =>
-                              openConfirm(
-                                user.is_active ? "Deactivate User" : "Activate User",
-                                `Are you sure you want to ${user.is_active ? "deactivate" : "activate"} "${user.name}"?`,
-                                () => handleToggleStatus(user.id)
-                              )
-                            }
-                          >
-                            {user.is_active ? (
-                              <IconPlayerPause size={18} />
-                            ) : (
-                              <IconPlayerPlay size={18} />
-                            )}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={user.is_super_admin ? "Cannot delete Super Admin" : "Delete"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            disabled={actionLoading === user.id || user.is_super_admin}
-                            onClick={() =>
-                              openConfirm(
-                                "Delete User",
-                                `Are you sure you want to delete "${user.name}"? This action cannot be undone.`,
-                                () => handleDeleteUser(user.id)
-                              )
-                            }
-                          >
-                            <IconTrash size={18} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
+                  <TableCell align="right">{userActions(user)}</TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-
-        <TablePagination
-          component="div"
-          count={totalCount}
-          page={page}
-          onPageChange={handlePageChange}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          rowsPerPageOptions={[100, 250, 500, 1000]}
-        />
       </TableContainer>
+
+      <TablePagination
+        component="div"
+        count={totalCount}
+        page={page}
+        onPageChange={handlePageChange}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleRowsPerPageChange}
+        rowsPerPageOptions={[100, 250, 500, 1000]}
+      />
+    </Paper>
 
       <Dialog open={confirmDialog.open} onClose={closeConfirm} maxWidth="xs" fullWidth>
         <DialogTitle>{confirmDialog.title}</DialogTitle>

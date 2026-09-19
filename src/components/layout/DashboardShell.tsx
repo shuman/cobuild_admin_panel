@@ -8,6 +8,8 @@ const MainWrapper = styled("div")(() => ({
   display: "flex",
   minHeight: "100vh",
   width: "100%",
+  maxWidth: "100vw",
+  overflowX: "hidden",
 }));
 
 const PageWrapper = styled("div")(() => ({
@@ -17,6 +19,9 @@ const PageWrapper = styled("div")(() => ({
   flexDirection: "column",
   zIndex: 1,
   backgroundColor: "transparent",
+  minWidth: 0,
+  maxWidth: "100%",
+  overflowX: "hidden",
 }));
 
 export default function DashboardShell({
@@ -24,7 +29,7 @@ export default function DashboardShell({
 }: {
   children: React.ReactNode;
 }) {
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
@@ -36,8 +41,22 @@ export default function DashboardShell({
       />
       <PageWrapper className="page-wrapper">
         <Header toggleMobileSidebar={() => setMobileSidebarOpen(true)} />
-        <Container sx={{ paddingTop: "20px", maxWidth: "1200px" }}>
-          <Box sx={{ minHeight: "calc(100vh - 170px)" }}>{children}</Box>
+        <Container
+          maxWidth={false}
+          disableGutters
+          sx={{
+            paddingTop: { xs: "16px", sm: "24px" },
+            paddingBottom: { xs: "24px", sm: "32px" },
+            px: { xs: 2, sm: 3, md: 4 },
+            maxWidth: "1280px",
+            width: "100%",
+            boxSizing: "border-box",
+            overflowX: "hidden",
+          }}
+        >
+          <Box sx={{ minHeight: "calc(100vh - 170px)", width: "100%", maxWidth: "100%", minWidth: 0 }}>
+            {children}
+          </Box>
         </Container>
       </PageWrapper>
     </MainWrapper>

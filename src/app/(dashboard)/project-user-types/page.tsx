@@ -38,6 +38,7 @@ import {
   Select,
   MenuItem,
   FormGroup,
+  Skeleton,
 } from "@mui/material";
 import {
   IconSearch,
@@ -549,6 +550,54 @@ function ViewPermissionsDialog({
 
 type SortField = "name" | "slug" | "created_at" | "updated_at" | "is_active";
 
+/** Row actions shared by the desktop table and the mobile card list. */
+function TypeActions({
+  type,
+  actionLoading,
+  onToggle,
+  onEdit,
+  onDelete,
+}: {
+  type: ProjectUserType;
+  actionLoading: string | null;
+  onToggle: (type: ProjectUserType) => void;
+  onEdit: (type: ProjectUserType) => void;
+  onDelete: (type: ProjectUserType) => void;
+}) {
+  return (
+    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+      <Tooltip title={type.is_active ? "Deactivate" : "Activate"}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={() => onToggle(type)}
+            disabled={actionLoading === type.id}
+            color={type.is_active ? "success" : "default"}
+          >
+            {actionLoading === type.id ? (
+              <CircularProgress size={16} />
+            ) : type.is_active ? (
+              <IconToggleRight size={18} />
+            ) : (
+              <IconToggleLeft size={18} />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+      <Tooltip title="Edit">
+        <IconButton size="small" onClick={() => onEdit(type)}>
+          <IconEdit size={17} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete">
+        <IconButton size="small" color="error" onClick={() => onDelete(type)}>
+          <IconTrash size={17} />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ProjectUserTypesPage() {
@@ -685,8 +734,25 @@ export default function ProjectUserTypesPage() {
   const activeCount = types.filter((t) => t.is_active).length;
   const inactiveCount = totalCount - activeCount;
 
+  // Shared row actions for the desktop table and mobile card list
+  const typeActions = (type: ProjectUserType) => (
+    <TypeActions
+      type={type}
+      actionLoading={actionLoading}
+      onToggle={handleToggleStatus}
+      onEdit={(t) => {
+        setEditTarget(t);
+        setAddEditDialog(true);
+      }}
+      onDelete={(t) => {
+        setDeleteTarget(t);
+        setDeleteDialog(true);
+      }}
+    />
+  );
+
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
       {/* ── Header ── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3} flexWrap="wrap" gap={2}>
         <Box>
@@ -734,13 +800,18 @@ export default function ProjectUserTypesPage() {
       </Stack>
 
       {/* ── Toolbar ── */}
-      <Stack direction="row" spacing={2} mb={2} alignItems="center" flexWrap="wrap">
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        mb={2}
+        alignItems={{ xs: "stretch", sm: "center" }}
+      >
         <TextField
           size="small"
           placeholder="Search by name, slug, or description…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 300 }}
+          sx={{ minWidth: { sm: 300 }, width: { xs: "100%" }, flexGrow: 1 }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -749,7 +820,7 @@ export default function ProjectUserTypesPage() {
             ),
           }}
         />
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: { sm: 140 }, width: { xs: "100%" } }}>
           <InputLabel>Status</InputLabel>
           <Select
             label="Status"
@@ -762,7 +833,11 @@ export default function ProjectUserTypesPage() {
           </Select>
         </FormControl>
         <Tooltip title="Refresh">
-          <IconButton onClick={fetchTypes} disabled={loading}>
+          <IconButton
+            onClick={fetchTypes}
+            disabled={loading}
+            sx={{ alignSelf: { xs: "flex-end", sm: "center" } }}
+          >
             {loading ? <CircularProgress size={18} /> : <IconRefresh size={18} />}
           </IconButton>
         </Tooltip>
@@ -775,7 +850,112 @@ export default function ProjectUserTypesPage() {
       )}
 
       {/* ── Table ── */}
-      <TableContainer component={Paper} variant="outlined">
+      <Paper variant="outlined">
+        {/* Mobile: compact card list */}
+        <Box sx={{ display: { xs: "block", md: "none" }, p: { xs: 1.5, sm: 2 } }}>
+          {loading ? (
+            [0, 1, 2, 3].map((i) => (
+              <Box
+                key={i}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                }}
+              >
+                <Skeleton variant="text" width="55%" />
+                <Skeleton variant="text" width="80%" />
+                <Skeleton variant="rounded" width={150} height={22} />
+              </Box>
+            ))
+          ) : types.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+              No project user types found
+            </Typography>
+          ) : (
+            types.map((type) => (
+              <Box
+                key={type.id}
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                  mb: 1.5,
+                  opacity: actionLoading === type.id ? 0.5 : 1,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={1}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      {type.name}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontFamily: "monospace" }}
+                    >
+                      {type.slug}
+                    </Typography>
+                    {type.description && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {type.description}
+                      </Typography>
+                    )}
+                  </Box>
+                  {typeActions(type)}
+                </Stack>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  alignItems="center"
+                  sx={{ mt: 1, flexWrap: "wrap", rowGap: 0.5 }}
+                >
+                  <Chip
+                    label={type.is_active ? "Active" : "Inactive"}
+                    color={type.is_active ? "success" : "default"}
+                    size="small"
+                  />
+                  <Chip label={`${type.project_users_count ?? 0} users`} size="small" variant="outlined" />
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<IconShield size={14} />}
+                    onClick={() => {
+                      setViewTarget(type);
+                      setViewDialog(true);
+                    }}
+                    sx={{ fontSize: "0.72rem", py: 0.15, px: 1 }}
+                  >
+                    Permissions
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                    Created {new Date(type.created_at).toLocaleDateString()}
+                  </Typography>
+                </Stack>
+              </Box>
+            ))
+          )}
+        </Box>
+
+        {/* Desktop: table */}
+        <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: "action.hover" }}>
@@ -893,57 +1073,14 @@ export default function ProjectUserTypesPage() {
                       {new Date(type.created_at).toLocaleDateString()}
                     </Typography>
                   </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                      <Tooltip title={type.is_active ? "Deactivate" : "Activate"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleToggleStatus(type)}
-                            disabled={actionLoading === type.id}
-                            color={type.is_active ? "success" : "default"}
-                          >
-                            {actionLoading === type.id ? (
-                              <CircularProgress size={16} />
-                            ) : type.is_active ? (
-                              <IconToggleRight size={18} />
-                            ) : (
-                              <IconToggleLeft size={18} />
-                            )}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setEditTarget(type);
-                            setAddEditDialog(true);
-                          }}
-                        >
-                          <IconEdit size={17} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => {
-                            setDeleteTarget(type);
-                            setDeleteDialog(true);
-                          }}
-                        >
-                          <IconTrash size={17} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
+                  <TableCell align="right">{typeActions(type)}</TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
-      </TableContainer>
+        </TableContainer>
+      </Paper>
 
       {/* ── Add/Edit Dialog ── */}
       <UserTypeDialog

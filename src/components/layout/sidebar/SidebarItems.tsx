@@ -1,6 +1,6 @@
 import React from "react";
 import Menuitems from "./MenuItems";
-import { Box, Typography, Chip } from "@mui/material";
+import { Box, Chip } from "@mui/material";
 import {
   Logo,
   Sidebar as MUI_Sidebar,
@@ -11,8 +11,22 @@ import { IconPoint } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const renderMenuItems = (items: any[], pathDirect: string) => {
-  return items.map((item: any) => {
+interface SidebarMenuItem {
+  id?: string;
+  title?: string;
+  href?: string;
+  icon?: typeof IconPoint;
+  subheader?: string;
+  navlabel?: boolean;
+  disabled?: boolean;
+}
+
+const renderMenuItems = (
+  items: SidebarMenuItem[],
+  pathDirect: string,
+  onNavigate?: (event: React.MouseEvent<HTMLElement>) => void
+) => {
+  return items.map((item) => {
     const Icon = item.icon ? item.icon : IconPoint;
     const itemIcon = <Icon stroke={1.5} size="1.3rem" />;
 
@@ -47,7 +61,7 @@ const renderMenuItems = (items: any[], pathDirect: string) => {
     }
 
     return (
-      <Box px={3} key={item.id}>
+      <Box px={3} key={item.id} onClick={onNavigate}>
         <MenuItem
           key={item.id}
           isSelected={pathDirect === item?.href}
@@ -63,7 +77,11 @@ const renderMenuItems = (items: any[], pathDirect: string) => {
   });
 };
 
-const SidebarItems = () => {
+const SidebarItems = ({
+  onNavigate,
+}: {
+  onNavigate?: (event: React.MouseEvent<HTMLElement>) => void;
+}) => {
   const pathname = usePathname();
   const pathDirect = pathname;
 
@@ -74,10 +92,12 @@ const SidebarItems = () => {
       themeColor={"#5D87FF"}
       themeSecondaryColor={"#49beff"}
     >
-      <Logo img="" component={Link} to="/">
-        SuperAdmin
-      </Logo>
-      {renderMenuItems(Menuitems, pathDirect)}
+      <Box onClick={onNavigate}>
+        <Logo img="" component={Link} to="/">
+          SuperAdmin
+        </Logo>
+      </Box>
+      {renderMenuItems(Menuitems, pathDirect, onNavigate)}
     </MUI_Sidebar>
   );
 };
