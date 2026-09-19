@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Providers from "@/components/providers/Providers";
+import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import "./global.css";
 
 export const metadata: Metadata = {
@@ -11,6 +12,12 @@ export const metadata: Metadata = {
     "CoBuild Manager SuperAdmin Portal — manage users, projects, and platform operations.",
   applicationName: "CoBuild SuperAdmin",
   robots: { index: true, follow: true },
+  appleWebApp: {
+    capable: true,
+    title: "CoBuild SuperAdmin",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
   icons: {
     icon: [
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
@@ -42,6 +49,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

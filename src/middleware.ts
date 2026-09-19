@@ -10,12 +10,16 @@ export default auth((req: NextRequest & { auth: any }) => {
   const isLoggedIn = !!req.auth?.user;
   const { pathname } = req.nextUrl;
 
-  // Never intercept API routes, static files, or NextAuth routes
+  // Never intercept API routes, static files, NextAuth routes, or PWA files.
+  // SW update checks and manifest fetches must never receive a 307 -> login HTML.
   if (
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/favicon") ||
-    pathname.startsWith("/images")
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/sw.js") ||
+    pathname.startsWith("/site.webmanifest") ||
+    pathname.startsWith("/offline")
   ) {
     return NextResponse.next();
   }
