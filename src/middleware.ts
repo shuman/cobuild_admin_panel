@@ -11,15 +11,15 @@ export default auth((req: NextRequest & { auth: any }) => {
   const { pathname } = req.nextUrl;
 
   // Never intercept API routes, static files, NextAuth routes, or PWA files.
-  // SW update checks and manifest fetches must never receive a 307 -> login HTML.
+  // SW update checks and manifest/icon fetches must never receive a 307 ->
+  // login HTML — Chrome's install pipeline downloads manifest icons WITHOUT
+  // session cookies, so auth-gating them breaks PWA installability.
   if (
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon") ||
     pathname.startsWith("/images") ||
-    pathname.startsWith("/sw.js") ||
-    pathname.startsWith("/site.webmanifest") ||
-    pathname.startsWith("/offline")
+    pathname === "/offline" ||
+    /\.(png|ico|svg|webp|webmanifest|js|txt|xml|woff2?)$/.test(pathname)
   ) {
     return NextResponse.next();
   }
